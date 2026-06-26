@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人才测评 — 在线考试系统</title>
+<style>
+/* ============ 全局 ============ */
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --primary: #4f46e5; --primary-light: #eef2ff; --success: #059669;
+  --warning: #d97706; --danger: #dc2626; --gray-50: #f9fafb;
+  --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db;
+  --gray-500: #6b7280; --gray-700: #374151; --gray-900: #111827;
+  --radius: 8px; --shadow: 0 1px 3px rgba(0,0,0,.1);
+}
+body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--gray-100); color:var(--gray-900); line-height:1.6; }
+
+/* ============ 顶部工具栏 ============ */
+.header {
+  position:sticky; top:0; z-index:100;
+  background:#fff; border-bottom:1px solid var(--gray-200); padding:10px 24px;
+  display:flex; align-items:center; gap:20px; box-shadow:var(--shadow);
+}
+.header h1 { font-size:18px; white-space:nowrap; }
+.header .timer {
+  font-size:24px; font-weight:700; font-variant-numeric:tabular-nums;
+  color:var(--primary); min-width:80px; text-align:center;
+}
+.header .timer.warning { color:var(--warning); }
+.header .timer.danger { color:var(--danger); animation:blink 1s infinite; }
+@keyframes blink { 50%{opacity:.3;} }
+.progress-bar {
+  flex:1; height:8px; background:var(--gray-200); border-radius:4px; overflow:hidden;
+}
+.progress-bar .fill { height:100%; background:var(--primary); transition:width .3s; border-radius:4px; }
+.progress-text { font-size:13px; color:var(--gray-500); white-space:nowrap; }
+.btn {
+  padding:8px 20px; border:none; border-radius:var(--radius); font-size:14px;
+  cursor:pointer; font-weight:600; transition:all .2s;
+}
+.btn-primary { background:var(--primary); color:#fff; }
+.btn-primary:hover { filter:brightness(1.1); }
+.btn-outline { background:#fff; color:var(--primary); border:2px solid var(--primary); }
+.btn-outline:hover { background:var(--primary-light); }
+.btn-danger { background:var(--danger); color:#fff; }
+.btn-danger:hover { filter:brightness(1.1); }
+
+/* ============ 主体布局 ============ */
+.main { display:flex; min-height:calc(100vh - 60px); }
+.sidebar {
+  width:260px; min-width:260px; background:#fff; border-right:1px solid var(--gray-200);
+  padding:16px; overflow-y:auto; max-height:calc(100vh - 60px); position:sticky; top:60px;
+}
+.content { flex:1; padding:24px 32px; max-width:900px; overflow-y:auto; }
+
+/* ============ 侧边栏导航 ============ */
+.nav-group { margin-bottom:16px; }
+.nav-group-title {
+  font-size:13px; font-weight:700; color:var(--gray-700); padding:6px 8px;
+  cursor:pointer; display:flex; justify-content:space-between; align-items:center;
+  border-radius:4px; user-select:none;
+}
+.nav-group-title:hover { background:var(--gray-50); }
+.nav-group-title .arrow { transition:transform .2s; font-size:10px; }
+.nav-group-title.collapsed .arrow { transform:rotate(-90deg); }
+.nav-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; padding:8px 0; }
+.nav-grid.collapsed { display:none; }
+.nav-btn {
+  width:100%; aspect-ratio:1; border:1px solid var(--gray-200); border-radius:4px;
+  font-size:12px; font-weight:600; cursor:pointer; background:#fff; transition:all .15s;
+  display:flex; align-items:center; justify-content:center;
+}
+.nav-btn:hover { border-color:var(--primary); color:var(--primary); }
+.nav-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+.nav-btn.answered { background:var(--primary-light); border-color:var(--primary); color:var(--primary); }
+.nav-btn.answered.active { background:var(--primary); color:#fff; }
+
+/* ============ 题目卡片 ============ */
+.question-card {
+  background:#fff; border-radius:var(--radius); padding:32px;
+  box-shadow:var(--shadow); margin-bottom:24px;
+}
+.question-type-badge {
+  display:inline-block; padding:4px 12px; border-radius:20px; font-size:12px;
+  font-weight:700; margin-bottom:16px;
+}
+.badge-choice { background:#dbeafe; color:#1e40af; }
+.badge-term { background:#dcfce7; color:#166534; }
+.badge-short { background:#fef3c7; color:#92400e; }
+.badge-essay { background:#fce7f3; color:#9d174d; }
+.question-num { font-size:13px; color:var(--gray-500); margin-bottom:8px; }
+.question-title { font-size:17px; font-weight:600; margin-bottom:24px; line-height:1.7; }
+
+/* 选择题选项 */
+.options { display:flex; flex-direction:column; gap:10px; }
+.option {
+  display:flex; align-items:flex-start; gap:12px; padding:12px 16px;
+  border:2px solid var(--gray-200); border-radius:var(--radius); cursor:pointer;
+  transition:all .15s; font-size:15px; line-height:1.5;
+}
+.option:hover { border-color:var(--primary); background:var(--primary-light); }
+.option.selected { border-color:var(--primary); background:var(--primary-light); }
+.option.correct { border-color:var(--success); background:#ecfdf5; }
+.option.wrong { border-color:var(--danger); background:#fef2f2; }
+.option-radio {
+  width:22px; height:22px; min-width:22px; border-radius:50%; border:2px solid var(--gray-300);
+  display:flex; align-items:center; justify-content:center; transition:all .15s;
+}
+.option.selected .option-radio { border-color:var(--primary); background:var(--primary); }
+.option.selected .option-radio::after { content:''; width:8px; height:8px; border-radius:50%; background:#fff; }
+.option.correct .option-radio { border-color:var(--success); background:var(--success); }
+.option.correct .option-radio::after { content:'✓'; color:#fff; font-size:12px; font-weight:700; }
+.option.wrong .option-radio { border-color:var(--danger); background:var(--danger); }
+.option.wrong .option-radio::after { content:'✕'; color:#fff; font-size:11px; font-weight:700; }
+
+/* 文本输入 */
+.text-answer { width:100%; min-height:200px; padding:16px; border:2px solid var(--gray-200);
+  border-radius:var(--radius); font-size:15px; line-height:1.8; resize:vertical;
+  font-family:inherit; transition:border-color .2s; }
+.text-answer:focus { outline:none; border-color:var(--primary); }
+.text-answer.large { min-height:400px; }
+
+/* 导航按钮 */
+.nav-buttons { display:flex; justify-content:space-between; margin-top:24px; gap:12px; }
+
+/* 解析/参考答案区域 */
+.explanation {
+  margin-top:20px; padding:20px; background:var(--gray-50); border-radius:var(--radius);
+  border-left:4px solid var(--primary); display:none;
+}
+.explanation.show { display:block; }
+.explanation h4 { color:var(--primary); margin-bottom:8px; font-size:15px; }
+.explanation p, .explanation li { font-size:14px; color:var(--gray-700); line-height:1.7; }
+.explanation ul { padding-left:20px; }
+.explanation table { width:100%; border-collapse:collapse; margin:8px 0; font-size:14px; }
+.explanation th, .explanation td { border:1px solid var(--gray-200); padding:6px 10px; text-align:left; }
+.explanation th { background:var(--gray-100); }
+
+/* ============ 结果页 ============ */
+.result-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:200;
+  display:none; align-items:flex-start; justify-content:center; padding-top:40px;
+  overflow-y:auto;
+}
+.result-overlay.show { display:flex; }
+.result-card {
+  background:#fff; border-radius:12px; padding:40px; max-width:800px; width:90%;
+  margin-bottom:40px; box-shadow:0 20px 60px rgba(0,0,0,.2);
+}
+.result-card h2 { text-align:center; margin-bottom:8px; font-size:24px; }
+.result-score {
+  text-align:center; font-size:64px; font-weight:800; color:var(--primary); margin:16px 0;
+}
+.result-score.perfect { color:var(--success); }
+.result-score.good { color:var(--primary); }
+.result-score.ok { color:var(--warning); }
+.result-score.low { color:var(--danger); }
+.result-detail { margin:24px 0; }
+.result-detail table { width:100%; border-collapse:collapse; }
+.result-detail th, .result-detail td {
+  border:1px solid var(--gray-200); padding:10px 14px; text-align:center; font-size:14px;
+}
+.result-detail th { background:var(--gray-50); font-weight:600; }
+.result-review { margin-top:16px; }
+.review-item {
+  margin-bottom:12px; padding:14px; background:var(--gray-50); border-radius:var(--radius);
+  border-left:4px solid var(--danger);
+}
+.review-item.correct-review { border-left-color:var(--success); }
+.review-item h4 { font-size:15px; margin-bottom:6px; }
+.review-item p { font-size:13px; color:var(--gray-500); }
+.result-actions { display:flex; gap:12px; justify-content:center; margin-top:24px; }
+
+/* 快捷键提示 */
+.shortcut-hint {
+  font-size:12px; color:var(--gray-500); text-align:center; padding:12px;
+}
+
+/* 确认弹窗 */
+.confirm-dialog {
+  position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:300;
+  display:none; align-items:center; justify-content:center;
+}
+.confirm-dialog.show { display:flex; }
+.confirm-box {
+  background:#fff; border-radius:12px; padding:32px; max-width:440px; width:90%; text-align:center;
+}
+.confirm-box h3 { margin-bottom:12px; }
+.confirm-box p { color:var(--gray-500); font-size:14px; margin-bottom:20px; }
+.confirm-box .actions { display:flex; gap:12px; justify-content:center; }
+
+/* ============ 错题本 ============ */
+.wrongbook-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:250;
+  display:none; align-items:flex-start; justify-content:center; padding-top:24px;
+  overflow-y:auto;
+}
+.wrongbook-overlay.show { display:flex; }
+.wrongbook-card {
+  background:#fff; border-radius:12px; padding:32px; max-width:800px; width:90%;
+  margin-bottom:40px; box-shadow:0 20px 60px rgba(0,0,0,.2);
+}
+.wrongbook-card h2 { margin-bottom:4px; }
+.wrongbook-stats { display:flex; gap:16px; align-items:center; margin:12px 0; flex-wrap:wrap; }
+.wrongbook-stats .stat { font-size:13px; color:var(--gray-500); }
+.wrongbook-stats .stat b { color:var(--danger); }
+.filter-chips { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 16px; }
+.filter-chip {
+  padding:4px 12px; border-radius:20px; font-size:12px; cursor:pointer;
+  border:1px solid var(--gray-200); background:#fff; transition:all .15s;
+}
+.filter-chip:hover { border-color:var(--primary); }
+.filter-chip.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+.wrongbook-item {
+  margin-bottom:12px; padding:14px; background:var(--gray-50); border-radius:var(--radius);
+  border-left:4px solid var(--danger);
+}
+.wrongbook-item h4 { font-size:15px; margin-bottom:4px; }
+.wrongbook-item .q-text { font-size:14px; color:var(--gray-700); margin-bottom:8px; }
+.wrongbook-item .ans-row { font-size:13px; }
+.wrongbook-item .ans-row .wrong { color:var(--danger); font-weight:600; }
+.wrongbook-item .ans-row .correct { color:var(--success); font-weight:600; }
+.wrongbook-item .item-meta { font-size:11px; color:var(--gray-500); margin-top:6px; }
+.wrongbook-empty { text-align:center; padding:60px 20px; color:var(--gray-500); }
+.wrongbook-empty .icon { font-size:64px; margin-bottom:16px; }
+.wrongbook-empty p { font-size:16px; }
+
+/* ============ 题型选择弹窗 ============ */
+.type-select-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:300;
+  display:flex; align-items:center; justify-content:center;
+}
+.type-select-overlay.hidden { display:none; }
+.type-select-card {
+  background:#fff; border-radius:12px; padding:32px; max-width:440px; width:90%;
+}
+.type-select-card h3 { margin-bottom:8px; }
+.type-select-card .subtitle { font-size:13px; color:var(--gray-500); margin-bottom:20px; }
+.type-option {
+  display:flex; align-items:center; gap:14px; padding:14px 16px;
+  border:2px solid var(--gray-200); border-radius:var(--radius); margin-bottom:10px;
+  cursor:pointer; transition:all .15s;
+}
+.type-option:hover { border-color:var(--primary); background:var(--primary-light); }
+.type-option.selected { border-color:var(--primary); background:var(--primary-light); }
+.type-option .type-icon { font-size:24px; }
+.type-option .type-info { flex:1; }
+.type-option .type-info .name { font-size:15px; font-weight:600; }
+.type-option .type-info .desc { font-size:12px; color:var(--gray-500); }
+.type-checkbox {
+  width:24px; height:24px; min-width:24px; border-radius:6px; border:2px solid var(--gray-300);
+  display:flex; align-items:center; justify-content:center; transition:all .15s;
+}
+.type-option.selected .type-checkbox { background:var(--primary); border-color:var(--primary); }
+.type-option.selected .type-checkbox::after { content:'✓'; color:#fff; font-size:14px; font-weight:700; }
+.type-select-actions { display:flex; gap:10px; margin-top:16px; }
+.type-select-actions .btn { flex:1; }
+.type-select-warning { font-size:12px; color:var(--warning); margin-top:10px; text-align:center; }
+
+/* ============ 起始页 ============ */
+.home-screen {
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding:24px;
+}
+.home-screen.hidden { display:none; }
+.home-card {
+  background:#fff; border-radius:16px; padding:48px 40px; max-width:520px; width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,.25); text-align:center;
+}
+.home-card .logo { font-size:56px; margin-bottom:12px; }
+.home-card h1 { font-size:26px; margin-bottom:4px; }
+.home-card .subtitle { font-size:14px; color:var(--gray-500); margin-bottom:28px; }
+
+/* 统计卡片 */
+.home-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:24px; }
+.home-stat {
+  background:var(--gray-50); border-radius:10px; padding:14px 8px;
+  text-align:center;
+}
+.home-stat .num { font-size:28px; font-weight:800; color:var(--primary); }
+.home-stat .label { font-size:11px; color:var(--gray-500); margin-top:2px; }
+
+/* 起始页题型选择 */
+.home-types { text-align:left; margin-bottom:24px; }
+.home-types .section-label { font-size:13px; font-weight:700; color:var(--gray-700); margin-bottom:10px; }
+.home-type-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.home-type-chip {
+  display:flex; align-items:center; gap:8px; padding:10px 14px;
+  border:2px solid var(--gray-200); border-radius:10px; cursor:pointer;
+  transition:all .15s; font-size:14px;
+}
+.home-type-chip:hover { border-color:var(--primary); }
+.home-type-chip.selected { border-color:var(--primary); background:var(--primary-light); }
+.home-type-chip .chip-check {
+  width:20px; height:20px; min-width:20px; border-radius:5px; border:2px solid var(--gray-300);
+  display:flex; align-items:center; justify-content:center; font-size:11px; color:transparent;
+  transition:all .15s;
+}
+.home-type-chip.selected .chip-check { background:var(--primary); border-color:var(--primary); color:#fff; }
+.home-type-chip .chip-num { font-size:11px; color:var(--gray-500); margin-left:auto; }
+
+/* 起始页按钮 */
+.home-actions { display:flex; gap:10px; flex-direction:column; }
+.btn-start {
+  padding:14px 32px; border:none; border-radius:12px; font-size:18px; font-weight:700;
+  cursor:pointer; background:linear-gradient(135deg, #667eea, #764ba2);
+  color:#fff; transition:all .2s; width:100%;
+}
+.btn-start:hover { transform:translateY(-1px); box-shadow:0 8px 25px rgba(102,126,234,.4); }
+.home-actions .secondary-row { display:flex; gap:10px; }
+.home-actions .secondary-row .btn { flex:1; font-size:13px; }
+.home-footer { margin-top:20px; font-size:12px; color:var(--gray-500); }
+
+/* 考试容器 */
+#examContainer { display:none; }
+#examContainer.show { display:block; }
+
+/* 打印 */
+@media print {
+  .header, .sidebar, .nav-buttons, .shortcut-hint, .btn { display:none !important; }
+  .main { display:block; }
+  .content { max-width:100%; padding:0; }
+  .question-card { box-shadow:none; break-inside:avoid; padding:16px; }
+  .explanation { display:block !important; }
+  .option { pointer-events:none; }
+  .option.correct { border-color:var(--success); }
+  body { font-size:12px; }
+}
+
+/* 响应式 */
+@media (max-width:768px) {
+  .sidebar { display:none; }
+  .content { padding:16px; }
+  .header { padding:8px 12px; gap:10px; }
+  .header h1 { font-size:14px; }
+  .header .timer { font-size:18px; }
+  .question-card { padding:20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ====== 起始页 ====== -->
+<div class="home-screen" id="homeScreen">
+  <div class="home-card">
+    <div class="logo">📋</div>
+    <h1>人才测评在线考试</h1>
+    <p class="subtitle">课程自测练习系统 · 考点全覆盖</p>
+    <div class="home-stats" id="homeStats"></div>
+    <div class="home-types">
+      <div class="section-label">选择练习题型</div>
+      <div class="home-type-row" id="homeTypeRow"></div>
+    </div>
+    <div class="home-actions">
+      <button class="btn-start" onclick="startExam()">▶️ 开始答题</button>
+      <div class="secondary-row">
+        <button class="btn btn-outline" onclick="showWrongBook()">📒 错题本 <small id="homeWrongCount">0</small></button>
+        <button class="btn btn-outline" id="btnResume" style="display:none" onclick="startExam()">📌 继续上次</button>
+      </div>
+    </div>
+    <p class="home-footer">⌨️ 答题快捷键：← → 翻题 ｜ 选择题按 1-4 选选项</p>
+  </div>
+</div>
+
+<!-- ====== 考试界面容器 ====== -->
+<div id="examContainer">
+
+<!-- 顶部工具栏 -->
+<header class="header">
+  <h1>📋 人才测评考试</h1>
+  <div class="timer" id="timer">00:00</div>
+  <div class="progress-bar"><div class="fill" id="progressFill" style="width:0%"></div></div>
+  <span class="progress-text" id="progressText">0/43</span>
+  <button class="btn btn-outline" onclick="showWrongBook()">📒 错题本 <small id="wrongCount">0</small></button>
+  <button class="btn btn-outline" onclick="showTypeSelect()">⚙️ 题型</button>
+  <button class="btn btn-outline" onclick="resetExam()">🔄 重置</button>
+  <button class="btn btn-primary" onclick="showConfirm()">📝 提交</button>
+</header>
+
+<!-- 主体 -->
+<div class="main">
+  <!-- 侧边栏 -->
+  <nav class="sidebar" id="sidebar">
+    <div class="nav-group">
+      <div class="nav-group-title" onclick="toggleGroup(this)">
+        单选题 <small>(20题)</small> <span class="arrow">▼</span>
+      </div>
+      <div class="nav-grid" id="navChoice"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title" onclick="toggleGroup(this)">
+        名词解释 <small>(10题)</small> <span class="arrow">▼</span>
+      </div>
+      <div class="nav-grid" id="navTerm"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title" onclick="toggleGroup(this)">
+        简答题 <small>(10题)</small> <span class="arrow">▼</span>
+      </div>
+      <div class="nav-grid" id="navShort"></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title" onclick="toggleGroup(this)">
+        论述/模拟题 <small>(3题)</small> <span class="arrow">▼</span>
+      </div>
+      <div class="nav-grid" id="navEssay"></div>
+    </div>
+  </nav>
+
+  <!-- 答题区 -->
+  <main class="content" id="questionArea"></main>
+</div>
+
+<!-- 提交确认弹窗 -->
+<div class="confirm-dialog" id="confirmDialog">
+  <div class="confirm-box">
+    <h3>确认提交？</h3>
+    <p id="confirmMsg">提交后不可修改，确定要提交吗？</p>
+    <div class="actions">
+      <button class="btn btn-outline" onclick="hideConfirm()">继续答题</button>
+      <button class="btn btn-danger" onclick="submitExam()">确认提交</button>
+    </div>
+  </div>
+</div>
+
+<!-- 错题本弹窗 -->
+<div class="wrongbook-overlay" id="wrongbookOverlay">
+  <div class="wrongbook-card" id="wrongbookCard"></div>
+</div>
+
+<!-- 题型选择弹窗 -->
+<div class="type-select-overlay hidden" id="typeSelectOverlay">
+  <div class="type-select-card">
+    <h3>⚙️ 选择练习题型</h3>
+    <p class="subtitle">勾选你想要练习的题型，未选中的题型将被跳过</p>
+    <div id="typeOptions"></div>
+    <div class="type-select-actions">
+      <button class="btn btn-outline" onclick="toggleAllTypes()" id="btnToggleAll">全不选</button>
+      <button class="btn btn-primary" onclick="applyTypeSelection()">✅ 确认</button>
+    </div>
+    <p class="type-select-warning" id="typeWarning" style="display:none">⚠ 修改题型选择将重置当前答题进度</p>
+  </div>
+</div>
+
+<!-- 结果弹窗 -->
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-card" id="resultCard"></div>
+</div>
+
+</div><!-- #examContainer -->
+
+<script>
+// ==================== 题目数据 ====================
+const choiceQuestions = [
+     {
+      "id": 1,
+      "topic": "三大核心假设",
+      "q": "人才测评之所以能够存在并发挥作用，其根本前提是：",
+      "opts": [
+       "A. 岗位需求可以被精准量化",
+       "B. 个体之间存在普遍且显著的心理特质差异",
+       "C. 所有测评工具都具备高效度",
+       "D. 面试官具有丰富的行业经验"
+      ],
+      "ans": 1,
+      "exp": "人才测评的三大核心假设之首是“人的差异理论”——个体在能力、性格、动机等心理特质方面存在普遍且显著的差异。若个体间无差异，测评与选拔便失去了核心价值。A项“岗位需求可被量化”是测评应用的目标而非前提假设；C项过于绝对；D项与人才能否被测评的根本前提无关。"
+     },
+     {
+      "id": 2,
+      "topic": "三大核心假设",
+      "q": "以下哪一项不属于人才测评的三大核心假设？",
+      "opts": [
+       "A. 人的差异理论",
+       "B. 人的素质稳定性",
+       "C. 素质可知可测性",
+       "D. 测评工具普适性"
+      ],
+      "ans": 3,
+      "exp": "三大核心假设是：①人的差异理论；②人的素质稳定性（核心素质成年后趋于稳定）；③素质可知可测性（内在素质通过外显行为表现，可被科学观察和量化）。“测评工具普适性”并非三大假设之一。"
+     },
+     {
+      "id": 3,
+      "topic": "冰山模型",
+      "q": "根据麦克利兰冰山模型，以下哪一项属于“冰山以下”的隐性素质？",
+      "opts": [
+       "A. 临床医学知识",
+       "B. 数据分析技能",
+       "C. 成就动机",
+       "D. 外语口语能力"
+      ],
+      "ans": 2,
+      "exp": "冰山以上为显性素质（知识、技能），约占30%，易于培养；冰山以下为隐性素质（社会角色、自我形象、特质、动机），约占70%，是决定长期绩效的核心。成就动机属于冰山以下最深层的“动机”层面。"
+     },
+     {
+      "id": 4,
+      "topic": "冰山模型",
+      "q": "关于冰山模型，以下说法正确的是：",
+      "opts": [
+       "A. 冰山以上的显性素质是决定长期高绩效的关键",
+       "B. 冰山以下的隐性素质可以通过短期培训快速改变",
+       "C. 冰山模型中显性素质占比约70%，隐性素质占比约30%",
+       "D. 真正影响高绩效的70%来自冰山之下的自我概念、特质与动机"
+      ],
+      "ans": 3,
+      "exp": "显性素质仅占约30%，隐性素质占约70%且难以通过短期培训改变，是决定长期高绩效的关键驱动力。A、B、C均与核心观点相反。"
+     },
+     {
+      "id": 5,
+      "topic": "冰山模型",
+      "q": "招聘考核若仅关注学历、证书、专业技能等“冰山以上”显性要素，最容易导致的后果是：",
+      "opts": [
+       "A. 招聘成本过高",
+       "B. 招到“能力强但意愿低”的员工，长期绩效疲软",
+       "C. 测评信度下降",
+       "D. 报名人数减少"
+      ],
+      "ans": 1,
+      "exp": "忽视冰山之下的漏洞是招聘最大隐患。仅关注Can Do（能做）忽视Will Do（愿做），容易招到能力达标但缺乏内在驱动力的人，导致长期绩效不佳和高离职率。"
+     },
+     {
+      "id": 6,
+      "topic": "素质与绩效关系",
+      "q": "在胜任素质模型中，胜任素质与工作绩效之间应呈现什么关系？",
+      "opts": [
+       "A. 倒U型关系",
+       "B. 反向因果关系",
+       "C. 明确的正向因果关系",
+       "D. U型关联关系"
+      ],
+      "ans": 2,
+      "exp": "胜任素质的核心特征在于它与工作绩效之间存在可验证的正向因果逻辑——素质是产生高绩效的前提（因），而非结果（果）。倒U型、反向因果、U型关联均不属于胜任素质的逻辑。"
+     },
+     {
+      "id": 7,
+      "topic": "素质与绩效关系",
+      "q": "以下哪个选项体现了胜任素质与绩效的“正向因果链”？",
+      "opts": [
+       "A. 适度压力 → 较高绩效（倒U型关系）",
+       "B. 高绩效 → 推断其具备领导力（反向因果）",
+       "C. 高成就动机 → 设定挑战目标并达成 → 超额完成业绩（正向因果）",
+       "D. 低压力 → 低绩效，高压力 → 低绩效（U型关系）"
+      ],
+      "ans": 2,
+      "exp": "C完整呈现正向因果链：关键素质（因）→ 高绩效行为 → 优异成果（果）。A为倒U型，B为反向因果，D为U型关系。"
+     },
+     {
+      "id": 8,
+      "topic": "BEI-STAR原则",
+      "q": "行为事件访谈法（BEI）的核心逻辑是：",
+      "opts": [
+       "A. 用当前的能力测试预测未来业绩",
+       "B. 用过去的行为预测未来的行为",
+       "C. 用学历背景推断工作能力",
+       "D. 用心理测评结果判断职业适配度"
+      ],
+      "ans": 1,
+      "exp": "BEI是一种开放式的行为回顾式探索技术，核心逻辑是“用过去的行为预测未来的行为”。通过让被访谈者回忆关键事件，挖掘导致绩效差异的具体行为及其背后的素质。"
+     },
+     {
+      "id": 9,
+      "topic": "BEI-STAR原则",
+      "q": "在BEI访谈的STAR原则中，最关键也是最难获取的信息要素是：",
+      "opts": [
+       "A. S（情境）",
+       "B. T（任务）",
+       "C. A（行动）",
+       "D. R（结果）"
+      ],
+      "ans": 2,
+      "exp": "A（行动）是提炼胜任素质最关键的行为证据——需要深入挖掘被访谈者“具体说了什么、做了什么”。候选人常停留在R层面，用“我们”模糊个人角色。最优追问话术是“你独立负责了哪几块工作？分别做了哪些具体事？”"
+     },
+     {
+      "id": 10,
+      "topic": "笔试难度设计",
+      "q": "选拔类笔试的理想平均难度系数应约为：",
+      "opts": [
+       "A. P = 0.1",
+       "B. P = 0.3",
+       "C. P = 0.5",
+       "D. P = 0.9"
+      ],
+      "ans": 2,
+      "exp": "P=0.5为中等难度，能使考生得分呈正态分布，实现最佳区分度。P=0.1导致地板效应，P=0.9导致天花板效应，均无法有效区分不同能力层级。"
+     },
+     {
+      "id": 11,
+      "topic": "笔试难度设计",
+      "q": "某次招聘笔试后统计发现90%的考生得分超过85分（满分100），这最可能说明：",
+      "opts": [
+       "A. 这批考生水平确实很高",
+       "B. 出现了“天花板效应”，题目难度过低",
+       "C. 测评信度非常高",
+       "D. 出现了“地板效应”，题目难度过高"
+      ],
+      "ans": 1,
+      "exp": "大部分考生得分极高说明题目难度过低，出现天花板效应——分数扎堆在高分段，无法有效区分中等与高水平候选人，丧失选拔鉴别意义。"
+     },
+     {
+      "id": 12,
+      "topic": "晕轮效应",
+      "q": "面试中，面试官因候选人拥有“光鲜的大厂履历”而产生好感，从而忽略其核心胜任力不足，给出偏高评价。这属于：",
+      "opts": [
+       "A. 近因效应",
+       "B. 首因效应",
+       "C. 晕轮效应（光环效应）",
+       "D. 暗示效应"
+      ],
+      "ans": 2,
+      "exp": "晕轮效应（光环效应）指面试官对候选人某个方面形成印象后，将此印象泛化到其他维度。近因效应=最后信息主导判断；首因效应=第一印象主导；暗示效应=受外部信息引导产生预判。"
+     },
+     {
+      "id": 13,
+      "topic": "晕轮效应",
+      "q": "克服面试中晕轮效应最有效的策略是：",
+      "opts": [
+       "A. 增加面试官人数",
+       "B. 延长面试时间",
+       "C. 执行结构化面试，严格按照预定问题清单和评分标准考察",
+       "D. 改用线上视频面试"
+      ],
+      "ans": 2,
+      "exp": "结构化面试是克服晕轮效应最核心的策略——通过预定问题清单和统一评分标准，使评价基于“事实行为”而非“主观印象”。辅以面试官小组独立打分后合议。"
+     },
+     {
+      "id": 14,
+      "topic": "信度与效度",
+      "q": "某测评工具在同一批被测者间隔两周后重测，两次得分高度一致，这说明该工具具有良好的：",
+      "opts": [
+       "A. 内容效度",
+       "B. 效标关联效度",
+       "C. 重测信度",
+       "D. 结构效度"
+      ],
+      "ans": 2,
+      "exp": "重测信度反映测评结果在时间维度上的一致性与稳定性。内容效度=题目对测量内容的代表性；效标关联效度=与外部标准关联；结构效度=对理论构念的测量程度。"
+     },
+     {
+      "id": 15,
+      "topic": "信度与效度",
+      "q": "关于信度与效度的关系，以下表述正确的是：",
+      "opts": [
+       "A. 高效度必以高信度为基础，高信度未必高效度",
+       "B. 高信度必以保证高效度",
+       "C. 信度与效度完全没有关系",
+       "D. 效度高则信度一定高，反之亦然"
+      ],
+      "ans": 0,
+      "exp": "信度是效度的必要条件而非充分条件。可高信度但低效度（测得很稳定但测的不是想测的）；要高效度必须先有高信度。"
+     },
+     {
+      "id": 16,
+      "topic": "评价中心技术",
+      "q": "以下哪种测评方法最适合评估中高层管理人员的综合管理潜力？",
+      "opts": [
+       "A. 专业知识笔试",
+       "B. 公文筐测试",
+       "C. 16PF人格测验",
+       "D. 履历分析"
+      ],
+      "ans": 1,
+      "exp": "公文筐测试通过模拟管理者处理文件，考察计划组织、决策判断、书面沟通、问题分析、授权分配五大核心能力，是评估管理潜力的核心工具。A测知识、C测人格、D为初筛。"
+     },
+     {
+      "id": 17,
+      "topic": "评价中心技术",
+      "q": "关于评价中心技术，以下说法错误的是：",
+      "opts": [
+       "A. 评价中心综合性强、预测效度高",
+       "B. 评价中心成本高、耗时长、实施复杂",
+       "C. 无领导小组讨论适合评估人际互动与领导潜力",
+       "D. 评价中心是一种单一的测评工具"
+      ],
+      "ans": 3,
+      "exp": "评价中心并非单一工具，而是综合运用LGD、公文筐、角色扮演、案例分析、结构化面试等多种方法的系统性评估体系。优点是综合性强、预测效度高；缺点是成本高、耗时长。"
+     },
+     {
+      "id": 18,
+      "topic": "履历分析",
+      "q": "履历分析中“核查逻辑一致性”不包括以下哪一项？",
+      "opts": [
+       "A. 核查工作与教育经历时间线是否重叠或存在断层",
+       "B. 分析职责与成果之间的因果关系，排除夸大表述",
+       "C. 直接根据薪资水平推断候选人的能力层级",
+       "D. 核验专业技能与过往履职场景及目标岗位要求的契合度"
+      ],
+      "ans": 2,
+      "exp": "核查逻辑一致性的三个要点：①时间逻辑连贯；②职责支撑成果；③技能匹配岗位。C“薪资等价能力”是常见误区。"
+     },
+     {
+      "id": 19,
+      "topic": "双向细目表",
+      "q": "在笔试命题中，双向细目表的“横向维度”通常代表：",
+      "opts": [
+       "A. 布鲁姆认知层次（记忆、理解、应用等）",
+       "B. 题型分布（选择、简答、论述等）",
+       "C. 具体学科或岗位的核心知识模块",
+       "D. 题目难度等级（易、中、难）"
+      ],
+      "ans": 2,
+      "exp": "横向维度=核心知识模块（确保覆盖面完整）；纵向维度=布鲁姆认知层次（实现对不同能力水平的考查）。B和D属于辅助双向表体系。"
+     },
+     {
+      "id": 20,
+      "topic": "洋葱模型",
+      "q": "以下哪一项最准确地描述了洋葱模型与冰山模型的关系？",
+      "opts": [
+       "A. 二者完全无关，测量不同的素质结构",
+       "B. 洋葱模型强调素质由外向内层层包裹，与冰山模型的核心思想一致",
+       "C. 洋葱模型只关注显性素质，冰山模型只关注隐性素质",
+       "D. 洋葱模型否定了冰山模型的核心假设"
+      ],
+      "ans": 1,
+      "exp": "洋葱模型与冰山模型核心思想一致——都强调素质是分层结构的。洋葱模型将素质描述为：最外层知识技能→中间层社会角色与自我形象→最内层核心动机与价值观。"
+     }
+];
+
+const termQuestions = [
+    {
+     "id": 21,
+     "topic": "冰山模型",
+     "q": "名词解释：麦克利兰冰山模型",
+     "ref": "<b>定义</b>：由哈佛大学教授戴维·麦克利兰提出的胜任素质分层模型，将个体素质划分为“冰山以上”（显性素质）和“冰山以下”（隐性素质）两部分。<br><br><b>核心要点</b>：①冰山以上：知识与技能，约占30%，外显、可见、易培养；②冰山以下：社会角色、自我形象、特质与动机，约占70%，内隐、深藏、难改变，是决定长期高绩效的核心驱动力。<br><br><b>示例</b>：销售人员的“产品知识”可通过培训提升，但其“成就动机”和“抗压能力”相对稳定，才是预测长期业绩的关键。"
+    },
+    {
+     "id": 22,
+     "topic": "洋葱模型",
+     "q": "名词解释：洋葱模型",
+     "ref": "<b>定义</b>：与冰山模型核心思想一致的胜任素质分层模型，强调素质由外向内层层包裹。<br><br><b>核心要点</b>：①最外层为知识技能（易观察、易改变）；②中间层为社会角色与自我形象；③最内层为核心动机与价值观（难观察、难改变）。<br><br><b>示例</b>：评估项目经理时，外层关注项目管理知识（PMP认证），中层关注团队角色定位，内层关注成就动机与职业价值观。核心命题：人才评估必须由表及里，深入探测隐性动力系统。"
+    },
+    {
+     "id": 23,
+     "topic": "BEI",
+     "q": "名词解释：行为事件访谈法（BEI）",
+     "ref": "<b>定义</b>：由麦克利兰开发的一种开放式、行为回顾式探索技术，被公认为构建胜任素质模型的“黄金标准”。<br><br><b>核心要点</b>：①通过让绩优员工与普通履职者回忆关键事件，挖掘导致绩效差异的关键行为及其背后素质；②核心逻辑为“用过去的行为预测未来的行为”；③使用STAR原则（S情境-T任务-A行动-R结果）引导深度访谈。<br><br><b>示例</b>：构建销售经理胜任模型时，请绩优者回忆“最成功的一次客户谈判”，从中提炼“客户需求洞察力”“利益博弈能力”等关键素质。"
+    },
+    {
+     "id": 24,
+     "topic": "STAR",
+     "q": "名词解释：STAR原则",
+     "ref": "<b>定义</b>：行为事件访谈（BEI）中的深度访谈四要素框架，共同构成完整的“行为证据链”。<br><br><b>四要素</b>：①S（Situation，情境）——事件发生的背景与挑战；②T（Task，任务）——被访谈者的角色与目标；③A（Action，行动）——“具体说了什么、做了什么”，是<b>最关键</b>的素质提取证据；④R（Result，结果）——行为带来的直接结果与影响。<br><br><b>关键注意</b>：A（行动）是核心。若候选人用“我们”模糊表述，应追问“你独立负责了哪几块工作？分别做了哪些具体事？”"
+    },
+    {
+     "id": 25,
+     "topic": "晕轮效应",
+     "q": "名词解释：晕轮效应",
+     "ref": "<b>定义</b>：又称光环效应，指面试官对候选人某个方面形成积极或消极印象后，将此印象泛化到其他评估维度，导致整体评价出现系统性偏差的认知现象。<br><br><b>核心要点</b>：①危险性在于让评价偏离“事实行为”滑向“主观印象”；②典型示例：因“大厂履历”而产生好感，忽略核心胜任力不足；③克服策略：执行结构化面试、面试官小组独立打分后合议。<br><br><b>辨析</b>：不同于近因效应（最后信息主导）、首因效应（第一印象主导）、暗示效应（外部信息引导预判）。"
+    },
+    {
+     "id": 26,
+     "topic": "信度",
+     "q": "名词解释：信度（Reliability）",
+     "ref": "<b>定义</b>：指测评结果的一致性与稳定性，即同一测评工具在不同时间、不同评分者或不同题本下能否得出一致结果。<br><br><b>类型</b>：①重测信度（时间一致性）；②内部一致性信度（题目间一致性）；③评分者信度（评分者间一致性）。<br><br><b>与效度的关系</b>：信度是效度的必要前提——高效度必以高信度为基础，但高信度未必高效度。<br><br><b>示例</b>：人格问卷间隔两周重测相关系数0.90，说明重测信度良好。<b>类比</b>：信度如射击弹着点集中度，效度如是否打中靶心。"
+    },
+    {
+     "id": 27,
+     "topic": "效度",
+     "q": "名词解释：效度（Validity）",
+     "ref": "<b>定义</b>：指测评工具是否实际测量了它所要测量的内容，即测评的有效性与准确性。回答“这个工具测到了它想测的东西吗？”<br><br><b>类型</b>：①内容效度（题目对测量内容的代表性）；②结构效度（对理论构念的测量程度）；③效标关联效度（与外部标准的关联程度）。<br><br><b>示例</b>：声称测量“领导力”的问卷大量涉及“会计知识”，则内容效度存疑——它测的不是领导力而是财务知识。理想测评工具应兼具高信度与高效度。"
+    },
+    {
+     "id": 28,
+     "topic": "评价中心",
+     "q": "名词解释：评价中心",
+     "ref": "<b>定义</b>：不是单一工具，而是一种系统性综合评估方法，通过综合运用无领导小组讨论、公文筐测验、角色扮演、案例分析、结构化面试等多种情境模拟技术，对候选人的胜任素质进行全面评估。<br><br><b>核心特征</b>：多工具、多维度、多评委。预测效度在各类人才评估方法中最高。<br><br><b>优缺点</b>：优点=综合性强、预测效度高、评估维度广；缺点=成本高、耗时长、实施复杂。<br><br><b>示例</b>：选拔区域总经理——第一天公文筐测试+LGD，第二天角色扮演+结构化面试，四位评委独立评分后综合决策。"
+    },
+    {
+     "id": 29,
+     "topic": "双向细目表",
+     "q": "名词解释：双向细目表",
+     "ref": "<b>定义</b>：一种标准化的试卷设计工具，以二维表格形式界定考试覆盖的知识内容范围（横向）及对考生认知能力层次的要求（纵向，对应布鲁姆认知层次）。<br><br><b>核心策略</b>：“先建表，后命题”——从源头确保内容覆盖面与能力层次分布科学合理。<br><br><b>辅助表体系</b>：题型-难度双向表、难度-分值双向表、内容-题型双向表。<br><br><b>示例</b>：为“人才测评”命题时，横向=测评理论/方法/工具/实践四大模块，纵向=记忆-理解-应用-分析四个层次，逐格划定权重后再命题。"
+    },
+    {
+     "id": 30,
+     "topic": "公文筐测试",
+     "q": "名词解释：公文筐测试",
+     "ref": "<b>定义</b>：专为管理人员设计的情境模拟测评工具。通过模拟管理者日常需处理的报告、请示、邮件、备忘录等文件，还原真实管理工作场景。<br><br><b>五大测评维度</b>：①计划与组织能力（排序优先级、规划流程）；②决策判断能力（基于有限信息快速识别关键问题）；③书面沟通能力（表达清晰、行文得体）；④问题分析能力（从零散信息中抓住本质）；⑤授权与资源分配（合理评估下属能力、统筹调配资源）。<br><br><b>实施策略</b>：内容与岗位高度匹配 + 建立标准化评分体系。主要适用于中高层管理人员选拔。"
+    }
+];
+
+const shortQuestions = [
+   {
+    "id": 31,
+    "topic": "三大核心假设",
+    "q": "简答题：简述人才测评的三大核心假设及其意义。",
+    "ref": "<b>① 人的差异理论</b>：个体在能力、性格、动机等心理特质方面存在普遍且显著的差异。这是人才测评存在的<b>根本前提</b>——若个体间无差异，测评便失去核心价值。<br><br><b>② 人的素质稳定性</b>：个体核心素质（性格、价值观、深层动机）在成年后趋于稳定，不会轻易随环境改变。这确保了测评结果的<b>时效性</b>，使通过当前测评预测未来行为和绩效成为可能。<br><br><b>③ 素质可知可测性</b>：内在抽象素质会通过外显行为、言语、绩效表现出来，可被科学方法观察、分析和量化。这是所有测评工具和方法能发挥作用的<b>逻辑基础</b>——让“看不见的素质”变得可衡量、可比较。<br><br><b>综合意义</b>：三者共同构成人才测评学科的理论基石。"
+   },
+   {
+    "id": 32,
+    "topic": "冰山模型",
+    "q": "简答题：简述冰山模型中显性素质与隐性素质的区别，以及对招聘考核的启示。",
+    "ref": "<b>区别</b>：<br>• 显性素质（冰山以上，约30%）：知识、技能——外显可见、易培养、通过笔试/实操考核测量、回答“Can Do”（能不能做）、是岗位准入门槛<br>• 隐性素质（冰山以下，约70%）：社会角色、自我形象、特质、动机——内隐深藏、难改变、通过BEI/情境模拟/心理测评测量、回答“Will Do”（愿不愿做）、是长期高绩效的核心引擎<br><br><b>对招聘考核的启示</b>：<br>① 不能仅关注学历、证书、技能等显性要素，否则易招到“能力强但意愿低”的员工<br>② 应将考察重心从“重技能”转向“重特质”，向冰山以下隐性素质倾斜<br>③ 需引入BEI访谈、情境模拟、心理测评等专业工具<br>④ 理想选拔应兼顾“能不能做”的显性门槛与“愿不愿做”的隐性动力"
+   },
+   {
+    "id": 33,
+    "topic": "素质与绩效关系",
+    "q": "简答题：简述胜任素质与工作绩效的正向因果关系。",
+    "ref": "<b>① 核心定义</b>：胜任素质与工作绩效之间存在可验证的正向因果逻辑——素质是产生高绩效的<b>前提（因）</b>，而非结果（果）。这是胜任素质模型的基石。<br><br><b>② 正向因果链示例</b>：高成就动机（关键素质/因）→ 设定挑战性目标并全力达成（高绩效行为）→ 超额完成业绩指标（优异成果/果）<br><br><b>③ 辨析非正向关系</b>：<br>• 倒U型关系（如压力与绩效）：适度压力最佳，不符合“素质决定绩效”定义<br>• 反向因果：颠倒逻辑，用绩效结果推断素质——正确逻辑是以素质预测绩效<br>• U型关联关系：部分特征与绩效呈U型，非稳定推动绩效的关键特质<br><br><b>④ 实践价值</b>：正向因果关系确保了素质模型能够真正预测和解释工作绩效。"
+   },
+   {
+    "id": 34,
+    "topic": "BEI-STAR",
+    "q": "简答题：简述BEI访谈中STAR原则的四要素。",
+    "ref": "<b>① S — 情境（Situation）</b>：引导回忆当时面临的具体情况、背景和挑战，锚定行为发生的场景。<br><br><b>② T — 任务（Task）</b>：聚焦被访谈者承担的具体任务、角色和目标，厘清职责边界。注意：追问T并非最优策略。<br><br><b>③ A — 行动（Action）</b>：深入挖掘“具体说了什么、做了什么”，是四要素中<b>最关键的行为证据</b>。核心追问话术：“你独立负责了哪几块工作？分别做了哪些具体事？”<br><br><b>④ R — 结果（Result）</b>：关注行为带来的直接结果和影响，验证行为有效性。需警惕候选人停留在R层面循环而回避A。<br><br><b>关键注意</b>：A（行动）是核心，避免追问T和R偏离目标；听到“我们”立刻打断追问个人行为；聚焦具象动词（制定/推动/协调）拒绝形容词堆砌。"
+   },
+   {
+    "id": 35,
+    "topic": "笔试难度",
+    "q": "简答题：简述选拔类笔试为何适宜采用平均难度系数P=0.5。",
+    "ref": "<b>① 难度系数定义</b>：P = 答对人数/总人数，P越接近1越容易，越接近0越难。<br><br><b>② P=0.5的统计学优势</b>：中等难度能使考生得分接近正态分布，方差最大化，实现最佳区分度——这是选拔类笔试的理想效果。<br><br><b>③ 偏离的后果</b>：<br>• 难度过高（P≈0.1）→ 地板效应：大部分考生得分极低，无法区分中等与低水平<br>• 难度过低（P≈0.9）→ 天花板效应：分数扎堆，无法区分中等与高水平<br><br><b>④ 优化策略</b>：<br>• 策略一：正式使用前严格执行题目试测，计算难度与区分度，剔除无效题<br>• 策略二：按简单:中等:难题≈3:4:3设计题库梯度"
+   },
+   {
+    "id": 36,
+    "topic": "晕轮效应",
+    "q": "简答题：简述如何克服面试中的晕轮效应。",
+    "ref": "<b>① 执行结构化面试</b>（最核心策略）：严格按照预定问题清单和统一评分标准考察，减少主观随意性。<br><br><b>② 采用STAR原则深挖行为</b>：聚焦候选人过去的具体行为事例，使评价基于“事实行为”而非“主观印象”。<br><br><b>③ 面试官小组独立打分后合议</b>：多人视角评价，抵消个人偏见。<br><br><b>④ 区分其他误差类型</b>：<br>• 近因效应 → 全程记录、均衡权重<br>• 首因效应 → 延迟评价、全程关注<br>• 暗示效应 → 信息隔离、独立判断<br><br><b>⑤ 建立多维度评分表</b>：将各胜任素质维度独立评分，防止印象泛化。<br><br><b>核心逻辑</b>：评价基于“事实行为”而非“主观印象”，通过标准化工具实现客观公正。"
+   },
+   {
+    "id": 37,
+    "topic": "信度与效度",
+    "q": "简答题：简述信度与效度的概念及二者关系。",
+    "ref": "<b>信度（Reliability）</b>：<br>• 定义：测评结果的一致性与稳定性<br>• 类型：重测信度、内部一致性信度、评分者信度<br>• 回答：“这个工具测出来的结果稳定吗？”<br><br><b>效度（Validity）</b>：<br>• 定义：测评是否实际测量了它所要测量的内容<br>• 类型：内容效度、结构效度、效标关联效度<br>• 回答：“这个工具测到了它想测的东西吗？”<br><br><b>二者关系</b>：<br>• 高效度<b>必以高信度为基础</b>——一致性都无法保证的工具不可能准确测量<br>• 高信度<b>未必高效度</b>——可能“测得很稳定，但测的不是想测的”<br>• 理想工具应<b>兼具高信度与高效度</b><br><br><b>类比</b>：信度=射击弹着点集中度；效度=是否打中靶心。弹着点可很集中（高信度）但全部偏离（低效度）；要打中靶心必先弹着点集中。"
+   },
+   {
+    "id": 38,
+    "topic": "评价中心",
+    "q": "简答题：简述评价中心技术的主要方法及其优缺点。",
+    "ref": "<b>主要方法</b>：<br>① 结构化面试：基于胜任素质的标准化问答评估<br>② 无领导小组讨论（LGD）：观察群体互动中的自然行为<br>③ 公文筐测验：模拟管理者处理文件，考察综合管理能力<br>④ 角色扮演：模拟冲突情境，评估应变与沟通能力<br>⑤ 案例分析/演讲：考察分析思维与表达说服力<br><br><b>优点</b>：综合性强（多工具多维度多评委）、预测效度最高（情境模拟还原真实场景）、评估维度广（认知+人际+管理）<br><br><b>缺点</b>：成本高（多名评委多环节）、耗时长（1-3天）、实施复杂（对评委培训要求高）<br><br><b>与单一方法比较</b>：LGD易受个体性格影响，角色扮演评分主观性强，评价中心通过多工具组合弥补单一方法不足。"
+   },
+   {
+    "id": 39,
+    "topic": "履历分析",
+    "q": "简答题：简述履历分析中“核查逻辑一致性”的三个要点。",
+    "ref": "<b>① 时间逻辑连贯</b>：确保工作与教育经历时间线无明显重叠，职业断层有合理且可验证的解释。如两份全职工作时间重合或长时间空白无合理解释，均属逻辑不一致信号。<br><br><b>② 职责支撑成果</b>：分析职责与成果间的因果关系，排除夸大或无法由职责履历支撑的表述。警惕“负责”“参与”等模糊词，聚焦可量化真实产出。<br><br><b>③ 技能匹配岗位</b>：核验候选人的专业技能与过往履职场景相吻合，且与目标岗位要求匹配。如声称精通Python者过去三年工作均不涉及编程，需进一步验证。<br><br><b>常见误区警示</b>：避免“唯学历论”（忽视实际经验）、“薪资等价能力”（忽略行业差异）、“重实习轻全职”（短期实习权重不应超过全职经历）。"
+   },
+   {
+    "id": 40,
+    "topic": "岗位-测评匹配",
+    "q": "简答题：简述岗位与测评工具的匹配逻辑。",
+    "ref": "<b>① 锚定胜任素质模型</b>：基于岗位分析明确核心素质要求，确保测评指标与关键绩效领域关联。测评不是选“最好的”而是选“最适合该岗位的”工具。<br><br><b>② 工具选型须匹配测评维度</b>：<br>• 笔试 → 测“Can Do”（知识技能），适合初筛<br>• 结构化面试+BEI追问 → 测动机、态度、价值观<br>• 情境模拟（LGD/角色扮演/公文筐） → 测真实场景行为表现<br>• 心理测评（16PF等） → 测底层人格特质<br><br><b>③ 避免典型误配</b>：<br>• 研发岗用角色扮演→应选笔试或项目答辩<br>• 高管仅用纸笔测验→需结合公文筐、LGD<br>• 领导风格问卷误作人格测验→前者测行为模式非人格“高低”<br><br><b>④ 组合化工具选型</b>：采用“笔试+面试+情境模拟”组合，焦点是“适配性”非“绝对优劣”——行为风格无好坏，关键是匹配岗位与组织文化。"
+   }
+];
+
+const essayQuestions = [
+  {
+   "id": 41,
+   "topic": "招聘考核设计",
+   "q": "论述题：某三甲医院拟招聘5名专职临床医师，往年报名人数超千人。如果你是该院人事科职员，负责拟定本次招聘考核细则，你会如何设计？请从<b>报名资格、考核流程和考核内容</b>三个角度展开论述。",
+   "ref": "<b>一、报名资格（六项基本要求）</b><br>1. 基本条件：中国国籍；遵守宪法法律；品行端正身心健康<br>2. 年龄：不超过35周岁<br>3. 应届毕业生界定：2026年毕业未落实单位；2024/2025届未就业可凭证明申报<br>4. 学历与证书：取得学历学位证书/教育部认证；住培合格证等可于2026.12.31前补交<br>5. 专业要求：参照《省考专业参考目录》，相近专业出具院校证明后认定<br>6. 回避规定：特定亲属关系不得应聘有直接上下级领导的岗位<br><br><b>二、考核流程（五阶段）</b><br>1. 报名与资格初审 → 公告发布后一周内<br>2. 笔试（专业知识+综合素质） → 初审后两周内，难度控制P≈0.5<br>3. 面试（结构化+LGD+角色扮演） → 笔试后一周内，体现评价中心理念<br>4. 体检与政审 → 面试结果公布后<br>5. 公示与录用 → 体检政审合格后<br><br><b>三、考核内容</b><br>（一）专业知识笔试：闭卷，涵盖临床基础、诊疗规范、伦理法规，命题前设计双向细目表<br>（二）综合能力面试：结构化面试（权重0.4）+ LGD（0.3）+ 角色扮演/医患沟通（0.3），权重总和=1.0（加权决策）<br>（三）辅助手段：16PF心理测评、实操技能考核、履历分析（结构化筛选表核查逻辑一致性）<br><br><b>设计原理</b>：笔试测冰山以上Can Do，面试和情境模拟测冰山以下Will Do；笔试P=0.5实现正态分布最佳区分度；结构化面试克服晕轮效应；多工具组合体现评价中心理念。"
+  },
+  {
+   "id": 42,
+   "topic": "无领导小组讨论",
+   "q": "模拟训练题——无领导小组讨论（海上求生排序）：<br>考察船触礁下沉，全队上救生筏，最近陆地在东南100海里。请对以下15件物品按重要性排序，30分钟内给出统一方案。<br><br>物品：指南针、小收音机、剃须镜、航海图、饮用水、巧克力二公斤、蚊帐、二锅头一箱、机油、钓鱼工具一套、救生圈、驱鲨剂一箱、压缩饼干一箱、15米细缆绳、30平方尺雨布一块。<br><br>请给出你的排序并说明理由，<b>同时说明该题的设计原理</b>。",
+   "ref": "<b>合理排序及理由（生存优先→求救→获救三阶段）</b>：<br>1. 饮用水 — 海上求生第一要素，无可替代<br>2. 压缩饼干 — 维持体能的基础食物<br>3. 剃须镜 — 日光反射求救信号，晴天可达数十公里<br>4. 雨布 — 遮阳防脱水+收集雨水+保温<br>5. 驱鲨剂 — 安全保障<br>6. 细缆绳 — 固定人员物品、辅助搭建<br>7. 救生圈 — 水中浮力辅助<br>8. 指南针 — 确认方向后辅助导航<br>9. 航海图 — 配合指南针定位<br>10. 巧克力 — 补充热量但可能加速口渴<br>11. 钓鱼工具 — 补充食物但不确定性高<br>12. 小收音机 — 信号覆盖有限<br>13. 机油 — 油膜减缓海浪，作用存疑<br>14. 蚊帐 — 实用性有限<br>15. 二锅头 — 酒精加速脱水和体温散失，有害<br><br><b>设计原理</b>：<br>① 测评目标：LGD资源排序题，探测冰山以下隐性素质（动机、特质、社会角色）<br>② 观察维度：主动发言、逻辑说服、冲突协调、团队整合、自然角色定位<br>③ 克服晕轮效应：15件物品制造足够分歧点，面试官独立打分后合议<br>④ 注意事项：沉默≠能力不足（需BEI追问区分内向与缺乏动机）；LGD不直接评估书面表达；讨论结果不重要，关键在过程中行为表现<br>⑤ 理论关联：冰山模型（测隐性素质）+ 晕轮效应克服 + 评价中心技术"
+  },
+  {
+   "id": 43,
+   "topic": "角色扮演",
+   "q": "模拟训练题——角色扮演（晋升演讲）：<br>你被提名晋升，还有其他候选人。人事经理备忘录通知：评选小组3-4名高管，每人10分钟演讲。但备忘录日期是昨天，电话通知15分钟后开始。你只有15分钟准备。<br><br>请回答四个问题：<b>①你为什么要讲？②你讲给谁听？③你准备讲些什么？④你准备如何讲？</b>同时说明该题的设计原理。",
+   "ref": "<b>① 为什么讲（演讲目的）</b>：直接目的=展示胜任资格争取晋升；深层目的=建立差异化竞争优势；战略定位=这是竞争性说服演讲，非述职汇报<br><br><b>② 讲给谁听（听众分析）</b>：3-4名高管，关注战略高度非操作细节，时间宝贵、面临多人比较，核心关切=职位理解、业绩、胜任力、对组织价值<br><br><b>③ 讲什么（内容框架，10分钟）</b>：<br>0-2' 开场：自我介绍+职位理解与向往（展示自我形象）<br>2-7' 核心：3个STAR论据（情境-任务-行动-结果），每个对应一项核心胜任素质<br>7-9' 展望：2-3项上任优先举措<br>9-10' 收尾：一句话总结核心优势<br><br><b>④ 怎么讲（演讲策略）</b>：<br>A.时间管理：2'框架+5'案例+3'打磨+3'预演+2'缓冲<br>B.表达策略：开场30秒锚定个人标签；STAR贯穿；金句收尾；眼神轮流接触<br>C.压力应对：展示快速组织思维的能力，不道歉<br><br><b>设计原理</b>：<br>① 类型：压力型/竞争型角色扮演，15分钟高压考察即时反应<br>② 测评维度：压力应对（特质）、快速结构化思维（自我概念）、说服表达（技能）、自我认知（自我形象）、成就动机（动机）→ 对应冰山各层级<br>③ 与STAR关联：演讲内容组织即STAR结构化呈现=用过去行为预测未来<br>④ 效度保障：情境与“向高管汇报”真实场景高度匹配（内容效度）；需制定四维度评分表标准化评分；与其他环节交叉验证"
+  }
+];
+
+
+// ==================== 状态管理 ====================
+let TOTAL = 43;
+let currentIndex = 0;
+let answers = {};        // {id: value}  — 选择题为选项索引(0-3)，文本题为字符串
+let startTime = Date.now();
+let timerInterval;
+let submitted = false;
+
+// 题型选择
+let selectedTypes = loadTypeSelection();
+
+function loadTypeSelection() {
+  try {
+    const d = JSON.parse(localStorage.getItem('rcTypeSelection'));
+    if (d) return d;
+  } catch(e){}
+  return {choice:true, term:true, short:true, essay:true};
+}
+function saveTypeSelection() {
+  try { localStorage.setItem('rcTypeSelection', JSON.stringify(selectedTypes)); } catch(e){}
+}
+
+// 加载/保存
+function loadState() {
+  try {
+    const d = JSON.parse(localStorage.getItem('rcExamState'));
+    if (d && d.answers) { answers = d.answers; currentIndex = d.currentIndex||0; startTime = d.startTime||Date.now(); return true; }
+  } catch(e){}
+  return false;
+}
+let saved = loadState();
+function saveState() {
+  try { localStorage.setItem('rcExamState', JSON.stringify({answers,currentIndex,startTime})); } catch(e){}
+}
+
+// ==================== 获取活跃题目 ====================
+function getActiveQuestions() {
+  const arr = [];
+  if (selectedTypes.choice) choiceQuestions.forEach(q=>arr.push({...q,type:'choice'}));
+  if (selectedTypes.term) termQuestions.forEach(q=>arr.push({...q,type:'term'}));
+  if (selectedTypes.short) shortQuestions.forEach(q=>arr.push({...q,type:'short'}));
+  if (selectedTypes.essay) essayQuestions.forEach(q=>arr.push({...q,type:'essay'}));
+  return arr;
+}
+let allQuestions = getActiveQuestions();
+function refreshQuestions() {
+  allQuestions = getActiveQuestions();
+  TOTAL = allQuestions.length;
+}
+
+// ==================== 渲染导航 ====================
+function buildNav() {
+  let offset = 0;
+  buildNavGroupExt('navChoice', choiceQuestions, offset, selectedTypes.choice); offset+=selectedTypes.choice?20:0;
+  buildNavGroupExt('navTerm', termQuestions, offset, selectedTypes.term); offset+=selectedTypes.term?10:0;
+  buildNavGroupExt('navShort', shortQuestions, offset, selectedTypes.short); offset+=selectedTypes.short?10:0;
+  buildNavGroupExt('navEssay', essayQuestions, offset, selectedTypes.essay);
+}
+function buildNavGroupExt(containerId, questions, offset, visible) {
+  const c = document.getElementById(containerId);
+  const parent = c.parentElement;
+  if (!visible) { parent.style.display='none'; return; }
+  parent.style.display='';
+  c.innerHTML = questions.map((q,i)=>{
+    const gid = offset+i;
+    const cls = gid===currentIndex?'active':(answers[q.id]!==undefined?'answered':'');
+    return `<button class="nav-btn ${cls}" onclick="goTo(${gid})">${i+1}</button>`;
+  }).join('');
+}
+function updateNavActive() {
+  document.querySelectorAll('.nav-btn').forEach((btn,i)=>{
+    btn.classList.remove('active');
+    if (i===currentIndex) btn.classList.add('active');
+  });
+}
+
+// ==================== 渲染题目 ====================
+function renderQuestion() {
+  if (submitted) return;
+  const q = allQuestions[currentIndex];
+  const area = document.getElementById('questionArea');
+  updateNavActive();
+  updateProgress();
+
+  const typeLabels = {choice:['单选题','badge-choice'],term:['名词解释','badge-term'],short:['简答题','badge-short'],essay:['论述/模拟题','badge-essay']};
+  const [label,badgeCls] = typeLabels[q.type];
+
+  let bodyHTML = '';
+  if (q.type === 'choice') {
+    const selected = answers[q.id];
+    bodyHTML = `<div class="options">${q.opts.map((opt,i)=>{
+      const cls = selected===i?'selected':'';
+      return `<div class="option ${cls}" onclick="selectChoice(${i})">
+        <div class="option-radio"></div><span>${opt}</span></div>`;
+    }).join('')}</div>`;
+  } else {
+    const cls = q.type==='essay'?'text-answer large':'text-answer';
+    const val = answers[q.id] || '';
+    bodyHTML = `<textarea class="${cls}" id="textInput" placeholder="请在此输入你的答案..." oninput="onTextInput(this.value)">${val}</textarea>`;
+  }
+
+  area.innerHTML = `
+    <div class="question-card">
+      <span class="question-type-badge ${badgeCls}">${label}</span>
+      <div class="question-num">第 ${currentIndex+1} 题 / 共 ${TOTAL} 题　|　${q.topic||''}</div>
+      <div class="question-title">${q.q}</div>
+      ${bodyHTML}
+      <div class="nav-buttons">
+        <button class="btn btn-outline" ${currentIndex===0?'disabled':''} onclick="goTo(${currentIndex-1})">← 上一题</button>
+        <span style="color:var(--gray-500);font-size:13px;line-height:36px;">键盘 ← → 翻题　选择题 1-4 选选项</span>
+        <button class="btn btn-outline" ${currentIndex===TOTAL-1?'disabled':''} onclick="goTo(${currentIndex+1})">下一题 →</button>
+      </div>
+    </div>`;
+
+  // 滚动到顶部
+  area.scrollIntoView({behavior:'smooth',block:'start'});
+  saveState();
+}
+
+// ==================== 交互处理 ====================
+function selectChoice(index) {
+  if (submitted) return;
+  const q = allQuestions[currentIndex];
+  answers[q.id] = index;
+  renderQuestion();
+  buildNav();
+  saveState();
+}
+function onTextInput(val) {
+  if (submitted) return;
+  const q = allQuestions[currentIndex];
+  if (val.trim()) answers[q.id] = val; else delete answers[q.id];
+  buildNav();
+  saveState();
+}
+function goTo(index) {
+  if (index<0||index>=TOTAL) return;
+  currentIndex = index;
+  renderQuestion();
+  saveState();
+}
+
+// ==================== 进度 & 计时 ====================
+function updateProgress() {
+  const answered = Object.keys(answers).length;
+  document.getElementById('progressFill').style.width = (answered/TOTAL*100)+'%';
+  document.getElementById('progressText').textContent = `${answered}/${TOTAL}`;
+}
+function updateTimer() {
+  const elapsed = Math.floor((Date.now()-startTime)/1000);
+  const m = Math.floor(elapsed/60), s = elapsed%60;
+  const el = document.getElementById('timer');
+  el.textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  el.classList.toggle('warning', elapsed>1800);
+  el.classList.toggle('danger', elapsed>3600);
+}
+
+// ==================== 提交确认 ====================
+function showConfirm() {
+  if (submitted) return;
+  const unanswered = TOTAL - Object.keys(answers).length;
+  const uList = [];
+  for (let i=0;i<TOTAL;i++) {
+    const q = allQuestions[i];
+    if (answers[q.id]===undefined) uList.push(`第${i+1}题`);
+  }
+  let msg = unanswered>0
+    ? `还有 <b>${unanswered}</b> 道题未作答：${uList.slice(0,5).join('、')}${uList.length>5?'...':''}<br>未答题目将计0分。确定提交吗？`
+    : '全部题目已作答，确定提交吗？';
+  document.getElementById('confirmMsg').innerHTML = msg;
+  document.getElementById('confirmDialog').classList.add('show');
+}
+function hideConfirm() { document.getElementById('confirmDialog').classList.remove('show'); }
+
+// ==================== 提交评分 ====================
+function submitExam() {
+  hideConfirm();
+  submitted = true;
+  clearInterval(timerInterval);
+  const elapsed = Math.floor((Date.now()-startTime)/1000);
+
+  // 选择题判分
+  let choiceCorrect = 0;
+  const reviewItems = [];
+  const wrongItems = [];
+  choiceQuestions.forEach((q,i)=>{
+    if (!selectedTypes.choice) return;
+    const userAns = answers[q.id];
+    const correct = userAns===q.ans;
+    if (correct) choiceCorrect++;
+    const item = {
+      num:allQuestions.findIndex(x=>x.id===q.id)+1,type:'choice',topic:q.topic,q:q.q,
+      userAns:userAns!==undefined?q.opts[userAns]:'未作答',
+      correctAns:q.opts[q.ans],
+      isCorrect:correct,exp:q.exp
+    };
+    reviewItems.push(item);
+    if (!correct) wrongItems.push({id:q.id, topic:q.topic, type:'choice', q:q.q, userAns:item.userAns, correctAns:item.correctAns, exp:q.exp});
+  });
+
+  const totalChoice = selectedTypes.choice ? 20 : 0;
+
+  // 文本题：不自动评分，只对照
+  const textReview = [];
+  const textSources = [];
+  if (selectedTypes.term) textSources.push(...termQuestions);
+  if (selectedTypes.short) textSources.push(...shortQuestions);
+  if (selectedTypes.essay) textSources.push(...essayQuestions);
+
+  textSources.forEach(q=>{
+    const gid = allQuestions.findIndex(x=>x.id===q.id);
+    textReview.push({
+      num:gid+1,type:q.type||(q.ref.includes('定义')?'term':'short'),
+      topic:q.topic,q:q.q,
+      userAns:answers[q.id]||'（未作答）',
+      ref:q.ref
+    });
+  });
+
+  // Auto-save wrong answers to wrong book
+  if (wrongItems.length > 0) saveWrongBook(wrongItems);
+
+  // 渲染结果
+  const ratio = totalChoice>0 ? choiceCorrect/totalChoice : 1;
+  let scoreClass='low', comment='继续加油，多复习重点回顾！';
+  if (ratio>=0.9) { scoreClass='perfect'; comment='非常优秀！你对人才测评知识掌握得很扎实！'; }
+  else if (ratio>=0.7) { scoreClass='good'; comment='表现不错！再巩固一下薄弱知识点即可。'; }
+  else if (ratio>=0.5) { scoreClass='ok'; comment='还需加强复习，重点关注错题涉及的知识点。'; }
+
+  const m = Math.floor(elapsed/60), s = elapsed%60;
+
+  // Build dynamic stats table
+  let statsRows = '';
+  if (selectedTypes.choice) statsRows += `<tr><td>单选题</td><td>20题</td><td><b>${choiceCorrect}分</b></td><td>自动判分</td></tr>`;
+  if (selectedTypes.term) statsRows += `<tr><td>名词解释</td><td>10题</td><td>-</td><td>请自行对照参考答案评估</td></tr>`;
+  if (selectedTypes.short) statsRows += `<tr><td>简答题</td><td>10题</td><td>-</td><td>请自行对照参考答案评估</td></tr>`;
+  if (selectedTypes.essay) statsRows += `<tr><td>论述/模拟题</td><td>3题</td><td>-</td><td>请自行对照参考答案评估</td></tr>`;
+
+  let scoreSection = '';
+  if (selectedTypes.choice) {
+    scoreSection = `
+    <div class="result-score ${scoreClass}">${choiceCorrect}/${totalChoice}</div>
+    <p style="text-align:center;color:var(--gray-500);">选择题得分 · 用时 ${m}分${s}秒</p>
+    <p style="text-align:center;font-size:16px;margin-top:8px;">${comment}</p>`;
+  } else {
+    scoreSection = `
+    <div style="text-align:center;padding:20px;color:var(--gray-500);">📝 本次练习未包含选择题<br>请自行对照参考答案评估文本题</div>`;
+  }
+
+  // Build review sections (only for selected types)
+  let choiceReviewHTML = '';
+  if (selectedTypes.choice) {
+    choiceReviewHTML = `
+    <h3 style="margin-top:24px;">📝 选择题逐题回顾</h3>
+    <div class="result-review">
+      ${reviewItems.map(r=>`
+        <div class="review-item ${r.isCorrect?'correct-review':''}">
+          <h4>${r.isCorrect?'✅':'❌'} 第${r.num}题（${r.topic}）</h4>
+          <p><b>题目：</b>${r.q}</p>
+          <p><b>你的答案：</b>${r.userAns}　<b>正确答案：</b>${r.correctAns}</p>
+          ${r.isCorrect?'<p style="color:var(--success)">回答正确 ✓</p>':`<p style="color:var(--danger)"><b>解析：</b>${r.exp}</p>`}
+        </div>
+      `).join('')}
+    </div>`;
+  }
+
+  let termReviewHTML = '';
+  if (selectedTypes.term) {
+    const items = textReview.filter(r=>r.type==='term');
+    if (items.length>0) {
+      termReviewHTML = `
+      <h3 style="margin-top:24px;">📖 名词解释 · 参考答案</h3>
+      <div class="result-review">
+        ${items.map(r=>`
+          <div class="review-item correct-review">
+            <h4>第${r.num}题（${r.topic}）</h4>
+            <p><b>你的答案：</b>${r.userAns.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>
+            <details style="margin-top:8px;"><summary style="cursor:pointer;color:var(--primary);font-weight:600;">查看参考答案</summary>
+            <div style="margin-top:8px;">${r.ref}</div></details>
+          </div>
+        `).join('')}
+      </div>`;
+    }
+  }
+
+  let shortReviewHTML = '';
+  if (selectedTypes.short) {
+    const items = textReview.filter(r=>r.type==='short');
+    if (items.length>0) {
+      shortReviewHTML = `
+      <h3 style="margin-top:24px;">📖 简答题 · 参考答案</h3>
+      <div class="result-review">
+        ${items.map(r=>`
+          <div class="review-item correct-review">
+            <h4>第${r.num}题（${r.topic}）</h4>
+            <p><b>你的答案：</b>${r.userAns.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>
+            <details style="margin-top:8px;"><summary style="cursor:pointer;color:var(--primary);font-weight:600;">查看参考答案要点</summary>
+            <div style="margin-top:8px;">${r.ref}</div></details>
+          </div>
+        `).join('')}
+      </div>`;
+    }
+  }
+
+  let essayReviewHTML = '';
+  if (selectedTypes.essay) {
+    const items = textReview.filter(r=>r.type==='essay');
+    if (items.length>0) {
+      essayReviewHTML = `
+      <h3 style="margin-top:24px;">📖 论述/模拟题 · 参考答案</h3>
+      <div class="result-review">
+        ${items.map(r=>`
+          <div class="review-item correct-review">
+            <h4>第${r.num}题（${r.topic}）</h4>
+            <p><b>你的答案：</b>${(r.userAns||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>
+            <details style="margin-top:8px;"><summary style="cursor:pointer;color:var(--primary);font-weight:600;">查看参考答案</summary>
+            <div style="margin-top:8px;">${r.ref}</div></details>
+          </div>
+        `).join('')}
+      </div>`;
+    }
+  }
+
+  document.getElementById('resultCard').innerHTML = `
+    <h2>📊 考试成绩单</h2>
+    ${scoreSection}
+    <div class="result-detail">
+      <table>
+        <tr><th>题型</th><th>题数</th><th>得分</th><th>说明</th></tr>
+        ${statsRows}
+      </table>
+    </div>
+    ${choiceReviewHTML}
+    ${termReviewHTML}
+    ${shortReviewHTML}
+    ${essayReviewHTML}
+    <div class="result-actions">
+      <button class="btn btn-outline" onclick="window.print()">🖨️ 打印成绩单</button>
+      <button class="btn btn-outline" onclick="showWrongBook()">📒 查看错题本</button>
+      <button class="btn btn-primary" onclick="resetExam()">🔄 重新答题</button>
+      <button class="btn btn-outline" onclick="goHome()">🏠 返回首页</button>
+    </div>
+  `;
+  document.getElementById('resultOverlay').classList.add('show');
+  document.getElementById('resultOverlay').scrollIntoView({behavior:'smooth'});
+}
+
+// ==================== 重置 ====================
+function resetExam() {
+  if (submitted && !confirm('确定要重新开始吗？当前答案将被清除。')) return;
+  if (!submitted && Object.keys(answers).length>0 && !confirm('确定要重置吗？当前所有答案将被清除。')) return;
+  goHome();
+}
+
+// ==================== 错题本 ====================
+function loadWrongBook() {
+  try { return JSON.parse(localStorage.getItem('rcWrongBook')) || []; }
+  catch(e){ return []; }
+}
+function saveWrongBook(items) {
+  const existing = loadWrongBook();
+  const map = new Map(existing.map(w=>[w.id, w]));
+  items.forEach(item => { map.set(item.id, {...item, time: new Date().toLocaleString()}); });
+  const merged = Array.from(map.values());
+  try { localStorage.setItem('rcWrongBook', JSON.stringify(merged)); } catch(e){}
+  updateWrongCount();
+  if (document.getElementById('wrongbookOverlay').classList.contains('show')) renderWrongBook();
+}
+function clearWrongBook() {
+  if (!confirm('确定要清空整个错题本吗？此操作不可恢复。')) return;
+  try { localStorage.removeItem('rcWrongBook'); } catch(e){}
+  updateWrongCount();
+  renderWrongBook();
+}
+function showWrongBook() {
+  renderWrongBook();
+  document.getElementById('wrongbookOverlay').classList.add('show');
+}
+function hideWrongBook() {
+  document.getElementById('wrongbookOverlay').classList.remove('show');
+}
+function updateWrongCount() {
+  const count = loadWrongBook().length;
+  const el = document.getElementById('wrongCount');
+  if (el) el.textContent = count;
+}
+function renderWrongBook(filterTopic) {
+  const wrongItems = loadWrongBook();
+  // Get unique topics
+  const topics = [...new Set(wrongItems.map(w=>w.topic))];
+  const filtered = filterTopic ? wrongItems.filter(w=>w.topic===filterTopic) : wrongItems;
+
+  const typeLabels = {choice:['单选题','badge-choice'],term:['名词解释','badge-term'],short:['简答题','badge-short'],essay:['论述/模拟题','badge-essay']};
+
+  if (wrongItems.length===0) {
+    document.getElementById('wrongbookCard').innerHTML = `
+      <h2>📒 错题本</h2>
+      <div class="wrongbook-empty">
+        <div class="icon">🎉</div>
+        <p>暂无错题，继续加油！</p>
+        <p style="font-size:13px;margin-top:8px;">提交考试后，错题会自动收录到这里</p>
+      </div>
+      <div style="text-align:center;margin-top:20px;"><button class="btn btn-outline" onclick="hideWrongBook()">关闭</button></div>`;
+    return;
+  }
+
+  document.getElementById('wrongbookCard').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <h2>📒 错题本</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" style="font-size:12px;padding:6px 14px;" onclick="clearWrongBook()">🗑️ 清空</button>
+        <button class="btn btn-outline" style="font-size:12px;padding:6px 14px;" onclick="hideWrongBook()">✕ 关闭</button>
+      </div>
+    </div>
+    <div class="wrongbook-stats">
+      <span class="stat">共 <b>${wrongItems.length}</b> 道错题</span>
+      ${filterTopic?`<span class="stat">筛选: <b>${filterTopic}</b></span>`:''}
+    </div>
+    <div class="filter-chips">
+      <span class="filter-chip ${!filterTopic?'active':''}" onclick="renderWrongBook(null)">全部</span>
+      ${topics.map(t=>`<span class="filter-chip ${filterTopic===t?'active':''}" onclick="renderWrongBook('${t}')">${t}</span>`).join('')}
+    </div>
+    ${filtered.length===0?`<div class="wrongbook-empty"><p>该知识点下暂无错题 🎉</p></div>`:''}
+    ${filtered.map(w=>{
+      const [label,badgeCls] = typeLabels[w.type]||['未知',''];
+      return `
+      <div class="wrongbook-item">
+        <h4><span class="question-type-badge ${badgeCls}" style="margin:0 8px 0 0;">${label}</span>${w.topic||''}</h4>
+        <div class="q-text">${w.q.substring(0,120)}${w.q.length>120?'...':''}</div>
+        ${w.userAns!==undefined?`<div class="ans-row">❌ 你的答案：<span class="wrong">${w.userAns||'未作答'}</span>　✅ 正确答案：<span class="correct">${w.correctAns||''}</span></div>`:''}
+        ${w.exp?`<details style="margin-top:6px;"><summary style="cursor:pointer;color:var(--primary);font-size:13px;font-weight:600;">查看解析</summary><p style="margin-top:4px;font-size:13px;color:var(--gray-500);">${w.exp}</p></details>`:''}
+        ${w.time?`<div class="item-meta">收录于 ${w.time}</div>`:''}
+      </div>`;
+    }).join('')}
+    <div style="text-align:center;margin-top:16px;"><button class="btn btn-outline" onclick="hideWrongBook()">关闭</button></div>`;
+}
+
+// ==================== 题型选择 ====================
+function showTypeSelect() {
+  const overlay = document.getElementById('typeSelectOverlay');
+  const warning = document.getElementById('typeWarning');
+  const hasAnswers = Object.keys(answers).length > 0;
+  warning.style.display = hasAnswers ? '' : 'none';
+  renderTypeOptions();
+  overlay.classList.remove('hidden');
+}
+function hideTypeSelect() {
+  document.getElementById('typeSelectOverlay').classList.add('hidden');
+}
+function toggleAllTypes() {
+  const allSelected = Object.values(selectedTypes).every(v=>v);
+  const newVal = !allSelected;
+  selectedTypes = {choice:newVal, term:newVal, short:newVal, essay:newVal};
+  renderTypeOptions();
+  renderHomeTypes();
+}
+function renderTypeOptions() {
+  const types = [
+    {key:'choice', name:'单选题', count:20, desc:'自动判分 · 限时练习', icon:'📝'},
+    {key:'term', name:'名词解释', count:10, desc:'自评对照 · 核心概念', icon:'📖'},
+    {key:'short', name:'简答题', count:10, desc:'自评对照 · 知识要点', icon:'✍️'},
+    {key:'essay', name:'论述/模拟题', count:3, desc:'自评对照 · 综合应用', icon:'📋'}
+  ];
+  const allSelected = Object.values(selectedTypes).every(v=>v);
+  document.getElementById('btnToggleAll').textContent = allSelected ? '取消全选' : '全选';
+  document.getElementById('typeOptions').innerHTML = types.map(t=>`
+    <div class="type-option ${selectedTypes[t.key]?'selected':''}" onclick="toggleType('${t.key}')">
+      <span class="type-icon">${t.icon}</span>
+      <div class="type-info">
+        <div class="name">${t.name} <small style="color:var(--gray-500)">(${t.count}题)</small></div>
+        <div class="desc">${t.desc}</div>
+      </div>
+      <div class="type-checkbox"></div>
+    </div>
+  `).join('');
+}
+function toggleType(key) {
+  selectedTypes[key] = !selectedTypes[key];
+  renderTypeOptions();
+  renderHomeTypes();
+}
+function applyTypeSelection() {
+  const count = Object.values(selectedTypes).filter(v=>v).length;
+  if (count===0) { alert('请至少选择一种题型'); return; }
+  const hasAnswers = Object.keys(answers).length > 0;
+  if (hasAnswers && !confirm('修改题型选择将清除当前所有答题进度，确定继续吗？')) return;
+  saveTypeSelection();
+  // Reset all progress
+  answers = {};
+  currentIndex = 0;
+  submitted = false;
+  startTime = Date.now();
+  refreshQuestions();
+  document.getElementById('resultOverlay').classList.remove('show');
+  document.getElementById('wrongbookOverlay').classList.remove('show');
+  hideTypeSelect();
+  clearInterval(timerInterval);
+  timerInterval = setInterval(updateTimer, 1000);
+  updateTimer();
+  updateWrongCount();
+  buildNav();
+  renderQuestion();
+  saveState();
+}
+
+// ==================== 起始页 ====================
+function renderHomeTypes() {
+  const types = [
+    {key:'choice', name:'单选题', count:20, icon:'📝'},
+    {key:'term', name:'名词解释', count:10, icon:'📖'},
+    {key:'short', name:'简答题', count:10, icon:'✍️'},
+    {key:'essay', name:'论述/模拟', count:3, icon:'📋'}
+  ];
+  document.getElementById('homeTypeRow').innerHTML = types.map(t=>`
+    <div class="home-type-chip ${selectedTypes[t.key]?'selected':''}" onclick="toggleHomeType('${t.key}')">
+      <span class="chip-check">✓</span>
+      <span>${t.icon} ${t.name}</span>
+      <span class="chip-num">${t.count}题</span>
+    </div>
+  `).join('');
+  // Update stats
+  const totalSelected = (selectedTypes.choice?20:0)+(selectedTypes.term?10:0)+(selectedTypes.short?10:0)+(selectedTypes.essay?3:0);
+  document.getElementById('homeStats').innerHTML = `
+    <div class="home-stat"><div class="num">${totalSelected}</div><div class="label">总题量</div></div>
+    <div class="home-stat"><div class="num">${selectedTypes.choice?20:0}</div><div class="label">选择题</div></div>
+    <div class="home-stat"><div class="num">~${Math.round(totalSelected*1.5)}min</div><div class="label">预计用时</div></div>
+  `;
+  // Update resume button
+  const hasProgress = loadState() && Object.keys(answers).length > 0;
+  document.getElementById('btnResume').style.display = hasProgress ? '' : 'none';
+}
+function toggleHomeType(key) {
+  selectedTypes[key] = !selectedTypes[key];
+  saveTypeSelection();
+  renderHomeTypes();
+  renderTypeOptions();
+}
+function renderHomeScreen() {
+  renderHomeTypes();
+  updateWrongCount();
+  document.getElementById('homeWrongCount').textContent = loadWrongBook().length;
+}
+function startExam() {
+  const count = Object.values(selectedTypes).filter(v=>v).length;
+  if (count===0) { alert('请至少选择一种题型'); return; }
+  saveTypeSelection();
+  refreshQuestions();
+  if (TOTAL===0) { alert('当前选择的题型无题目'); return; }
+  // Hide home, show exam
+  document.getElementById('homeScreen').classList.add('hidden');
+  document.getElementById('examContainer').classList.add('show');
+  // Preserve saved startTime if resuming; otherwise start fresh
+  if (!saved || Object.keys(answers).length===0) {
+    startTime = Date.now();
+  }
+  timerInterval = setInterval(updateTimer, 1000);
+  updateTimer();
+  buildNav();
+  renderQuestion();
+  saveState();
+}
+function goHome() {
+  submitted = false;
+  answers = {};
+  currentIndex = 0;
+  clearInterval(timerInterval);
+  document.getElementById('examContainer').classList.remove('show');
+  document.getElementById('homeScreen').classList.remove('hidden');
+  document.getElementById('resultOverlay').classList.remove('show');
+  document.getElementById('wrongbookOverlay').classList.remove('show');
+  saveState(); // 清除进度
+  refreshQuestions();
+  renderHomeScreen();
+}
+
+// ==================== 初始化按钮状态 ====================
+function updateWrongCount() {
+  const count = loadWrongBook().length;
+  const el = document.getElementById('wrongCount');
+  if (el) el.textContent = count;
+}
+
+// ==================== 导航折叠 ====================
+function toggleGroup(el) {
+  el.classList.toggle('collapsed');
+  el.nextElementSibling.classList.toggle('collapsed');
+}
+
+// ==================== 键盘快捷键 ====================
+document.addEventListener('keydown',(e)=>{
+  if (submitted) return;
+  if (TOTAL===0) return;
+  if (e.target.tagName==='TEXTAREA') return; // 不在文本框中拦截
+  if (e.key==='ArrowLeft') { e.preventDefault(); goTo(currentIndex-1); }
+  if (e.key==='ArrowRight') { e.preventDefault(); goTo(currentIndex+1); }
+  const q = allQuestions[currentIndex];
+  if (q && q.type==='choice') {
+    if (['1','2','3','4'].includes(e.key)) { e.preventDefault(); selectChoice(parseInt(e.key)-1); }
+  }
+});
+
+// ==================== 初始化 ====================
+function init() {
+  renderHomeScreen();
+  updateWrongCount();
+}
+
+init();
+console.log('✅ 人才测评在线考试系统已就绪');
+console.log('📋 快捷键：← → 翻题 | 1-4 选选项（选择题）');
+console.log('💾 答题进度已保存到 localStorage，刷新不丢失');
+</script>
+</body>
+</html>
